@@ -45,4 +45,16 @@ private:
 
     /// Értesíti az összes observer-t befejezésről
     void notifyComplete(double total_seconds);
+
+    // Szekvenciális mód állapota
+    std::vector<uint32_t> current_sequential_candidate_;
+
+    /// Beállítja a kezdőértéket a szekvenciális kereséshez
+    void initializeSequentialState();
+
+    /// Következő szekvenciális batch generálása
+    std::vector<std::vector<uint32_t>> generateSequentialBatch(uint32_t count);
+
+    /// BigInt hozzáadása (a += b)
+    static void addUi32(std::vector<uint32_t>& limbs, uint32_t val);
 };

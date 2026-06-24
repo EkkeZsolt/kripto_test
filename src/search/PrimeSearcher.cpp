@@ -6,6 +6,8 @@
 #include "utils/BigIntConverter.h"
 #include <chrono>
 #include <iostream>
+#include <fstream>
+#include <string>
 
 PrimeSearcher::PrimeSearcher(SearchConfig config,
                               std::unique_ptr<IPrimalityStrategy> strategy,
@@ -47,6 +49,57 @@ void PrimeSearcher::notifyComplete(double total_seconds) {
     }
 }
 
+void PrimeSearcher::addUi32(std::vector<uint32_t>& limbs, uint32_t val) {
+    uint64_t carry = val;
+    for (size_t i = 0; i < limbs.size() && carry > 0; i++) {
+        uint64_t sum = (uint64_t)limbs[i] + carry;
+        limbs[i] = (uint32_t)(sum & 0xFFFFFFFF);
+        carry = sum >> 32;
+    }
+}
+
+void PrimeSearcher::initializeSequentialState() {
+    const uint32_t num_limbs = config_.bitLength() / 32;
+    current_sequential_candidate_.assign(num_limbs, 0);
+    
+    // Kezdőérték: 3 (az első vizsgálandó páratlan prím jelölt 2 után)
+    current_sequential_candidate_[0] = 3;
+
+    // Próbáljuk meg kiolvasni az utolsó prímet a fájlból
+    if (!config_.outputFile().empty()) {
+        std::ifstream file(config_.outputFile());
+        if (file.is_open()) {
+            std::string line, last_hex;
+            while (std::getline(file, line)) {
+                // Keresünk egy sort, ami nem komment és tartalmaz " | "-t
+                if (!line.empty() && line[0] != '#') {
+                    size_t pos = line.rfind(" | ");
+                    if (pos != std::string::npos) {
+                        last_hex = line.substr(pos + 3);
+                    }
+                }
+            }
+            if (!last_hex.empty()) {
+                // Ha találtunk mentett prímet, onnan folytatjuk (+2)
+                BigIntConverter::fromHex(last_hex, current_sequential_candidate_.data(), num_limbs);
+                addUi32(current_sequential_candidate_, 2);
+                std::cout << "  Folytatas innen: " << last_hex << " + 2\n";
+            }
+        }
+    }
+}
+
+std::vector<std::vector<uint32_t>> PrimeSearcher::generateSequentialBatch(uint32_t count) {
+    std::vector<std::vector<uint32_t>> batch;
+    batch.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        batch.push_back(current_sequential_candidate_);
+        // Következő páratlan szám (+2)
+        addUi32(current_sequential_candidate_, 2);
+    }
+    return batch;
+}
+
 std::vector<std::string> PrimeSearcher::search() {
     std::vector<std::string> found_primes;
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -58,9 +111,15 @@ std::vector<std::string> PrimeSearcher::search() {
               << "\n  Cel: " << config_.targetPrimeCount() << " prim"
               << "\n" << std::endl;
 
-    while (total_found_ < config_.targetPrimeCount()) {
-        // 1. Random jelöltek generálása
-        auto candidates = generateCandidateBatch(config_.batchSize());
+    if (config_.sequentialMode()) {
+        initializeSequentialState();
+    }
+
+    while (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount()) {
+        // 1. Jelöltek generálása (random vagy szekvenciális)
+        auto candidates = config_.sequentialMode() 
+            ? generateSequentialBatch(config_.batchSize()) 
+            : generateCandidateBatch(config_.batchSize());
 
         // 2. Opcionális előszűrés trial division-nel
         if (prefilter_ && config_.usePrefilter()) {
@@ -87,7 +146,7 @@ std::vector<std::string> PrimeSearcher::search() {
 
         // 4. Prímek feldolgozása
         for (const auto& r : results) {
-            if (r.is_probably_prime && total_found_ < config_.targetPrimeCount()) {
+            if (r.is_probably_prime && (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount())) {
                 total_found_++;
                 const auto& limbs = candidates[r.index];
                 std::string hex = BigIntConverter::toHex(limbs.data(), (uint32_t)limbs.size());

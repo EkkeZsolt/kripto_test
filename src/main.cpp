@@ -55,7 +55,7 @@ void printUsage() {
     std::cout << "Hasznalat: LiptaiKripto [opciok]\n\n"
               << "Opciok:\n"
               << "  --bits N        Primek bit merete (default: 1024, max: 4096)\n"
-              << "  --count N       Hany primet keressen (default: 10)\n"
+              << "  --count N       Hany primet keressen (default: 0 = vegtelen)\n"
               << "  --batch-size N  GPU batch meret (default: 10000)\n"
               << "  --rounds N      Miller-Rabin iteraciok (default: 20)\n"
               << "  --strategy S    'millerrabin' vagy 'trial' (default: millerrabin)\n"
@@ -111,6 +111,9 @@ int main(int argc, char* argv[]) {
         }
         else if (arg == "--quiet") {
             builder.setVerbose(false);
+        }
+        else if (arg == "--random") {
+            builder.setSequentialMode(false);
         }
         else {
             std::cerr << "Ismeretlen opcio: " << arg << std::endl;

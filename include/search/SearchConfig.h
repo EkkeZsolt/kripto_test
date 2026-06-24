@@ -3,6 +3,7 @@
  *
  * Design Pattern: Builder
  * Fluent API a keresési paraméterek beállításához.
+ * Támogatja a szekvenciális keresési módot is.
  ***/
 
 #pragma once
@@ -25,7 +26,7 @@ public:
             return *this;
         }
 
-        /// Hány prímet keressen (default: 10)
+        /// Hány prímet keressen (default: 0 = végtelen)
         Builder& setPrimeCount(uint32_t count) {
             config_.target_prime_count_ = count;
             return *this;
@@ -43,13 +44,13 @@ public:
             return *this;
         }
 
-        /// Stratégia neve: "millerrabin" vagy "trial" (default: "millerrabin")
+        /// Stratégia neve: "millerrabin" vagy "trial" (default: "trial")
         Builder& setStrategy(const std::string& name) {
             config_.strategy_name_ = name;
             return *this;
         }
 
-        /// Kimeneti fájl (üres string = nincs fájl kimenet)
+        /// Kimeneti/resume fájl (default: "primes.txt")
         Builder& setOutputFile(const std::string& path) {
             config_.output_file_ = path;
             return *this;
@@ -73,6 +74,12 @@ public:
             return *this;
         }
 
+        /// Szekvenciális mód: 2-től végtelenig (default: true)
+        Builder& setSequentialMode(bool enabled) {
+            config_.sequential_mode_ = enabled;
+            return *this;
+        }
+
         SearchConfig build() { return std::move(config_); }
 
     private:
@@ -88,18 +95,20 @@ public:
     const std::string& outputFile() const { return output_file_; }
     bool usePrefilter() const { return use_prefilter_; }
     bool verbose() const { return verbose_; }
+    bool sequentialMode() const { return sequential_mode_; }
     const std::vector<std::shared_ptr<ISearchObserver>>& observers() const {
         return observers_;
     }
 
 private:
     uint32_t    bit_length_           = 1024;
-    uint32_t    target_prime_count_   = 10;
+    uint32_t    target_prime_count_   = 0;       // 0 = végtelen
     uint32_t    batch_size_           = 10000;
     uint32_t    mr_rounds_            = 20;
-    std::string strategy_name_        = "millerrabin";
-    std::string output_file_;
+    std::string strategy_name_        = "trial";  // szekvenciálishoz trial
+    std::string output_file_          = "primes.txt";
     bool        use_prefilter_        = true;
     bool        verbose_              = true;
+    bool        sequential_mode_      = true;     // alapból szekvenciális
     std::vector<std::shared_ptr<ISearchObserver>> observers_;
 };
