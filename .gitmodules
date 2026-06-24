@@ -1,0 +1,3 @@
+[submodule "external/CGBN"]
+	path = external/CGBN
+	url = https://github.com/NVlabs/CGBN.git

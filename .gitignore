@@ -1,0 +1,38 @@
+# Build
+build/
+out/
+cmake-build-*/
+x64/
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+*.vcxproj.user
+
+# Compiled
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# CUDA
+*.cubin
+*.fatbin
+*.ptx
+*.gpu
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Output
+results/
+*.csv
+*.log
