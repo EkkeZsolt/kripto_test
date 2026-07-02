@@ -30,9 +30,9 @@ std::vector<std::vector<uint32_t>> PrimeSearcher::generateCandidateBatch(uint32_
     return batch;
 }
 
-void PrimeSearcher::notifyPrimeFound(const std::string& prime_hex, uint32_t bit_length) {
+void PrimeSearcher::notifyPrimeFound(const std::string& prime_dec, uint32_t bit_length) {
     for (auto& obs : config_.observers()) {
-        obs->onPrimeFound(prime_hex, bit_length, total_found_);
+        obs->onPrimeFound(prime_dec, bit_length, total_found_);
     }
 }
 
@@ -79,48 +79,34 @@ void PrimeSearcher::initializeSequentialState() {
     if (!started_from_config && !config_.outputFile().empty()) {
         std::ifstream file(config_.outputFile());
         if (file.is_open()) {
-            std::string line, last_hex;
+            std::string line, last_dec;
             uint64_t last_index = 0;
             while (std::getline(file, line)) {
-                // Keresünk egy sort, ami nem komment és tartalmaz " | "-t
+                // Keresünk egy nem üres sort, ami nem komment
                 if (!line.empty() && line[0] != '#') {
-                    size_t first_pos = line.find(" | ");
-                    size_t last_pos = line.rfind(" | ");
-                    if (first_pos != std::string::npos && last_pos != std::string::npos) {
-                        try {
-                            last_index = std::stoull(line.substr(0, first_pos));
-                        } catch (...) {
-                            // Ha az index parsolása meghiúsul, békén hagyjuk
-                        }
-                        last_hex = line.substr(last_pos + 3);
-                    }
+                    last_index++;
+                    last_dec = line;
                 }
             }
-            if (!last_hex.empty()) {
+            if (!last_dec.empty()) {
                 total_found_ = last_index;
                 // Ha találtunk mentett prímet, onnan folytatjuk (+2)
-                BigIntConverter::fromHex(last_hex, current_sequential_candidate_.data(), num_limbs);
+                BigIntConverter::fromDecimal(last_dec, current_sequential_candidate_.data(), num_limbs);
                 addUi32(current_sequential_candidate_, 2);
-                std::cout << "  Folytatas innen: " << last_hex << " + 2 (Mentett index: " << last_index << ")\n";
+                std::cout << "  Folytatas innen: " << last_dec << " + 2 (Mentett index: " << last_index << ")\n";
                 return;
             }
             else {
                 // Ha nem találtunk mentett prímet, akkor a 2 a legelső prímünk!
                 total_found_++;
-                std::vector<uint32_t> two_limbs(num_limbs, 0);
-                two_limbs[0] = 2;
-                std::string hex = BigIntConverter::toHex(two_limbs.data(), num_limbs);
-                notifyPrimeFound(hex, config_.bitLength());
+                notifyPrimeFound("2", config_.bitLength());
             }
         }
     }
     else if (!started_from_config) {
         // Ha nincs kimeneti fájl megadva, és nem egyedi kezdőérték van, akkor is a 2 az első
         total_found_++;
-        std::vector<uint32_t> two_limbs(num_limbs, 0);
-        two_limbs[0] = 2;
-        std::string hex = BigIntConverter::toHex(two_limbs.data(), num_limbs);
-        notifyPrimeFound(hex, config_.bitLength());
+        notifyPrimeFound("2", config_.bitLength());
     }
 }
 
@@ -184,9 +170,9 @@ std::vector<std::string> PrimeSearcher::search() {
             if (r.is_probably_prime && (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount())) {
                 total_found_++;
                 const auto& limbs = candidates[r.index];
-                std::string hex = BigIntConverter::toHex(limbs.data(), (uint32_t)limbs.size());
-                found_primes.push_back(hex);
-                notifyPrimeFound(hex, config_.bitLength());
+                std::string dec = BigIntConverter::toDecimal(limbs.data(), (uint32_t)limbs.size());
+                found_primes.push_back(dec);
+                notifyPrimeFound(dec, config_.bitLength());
             }
         }
 

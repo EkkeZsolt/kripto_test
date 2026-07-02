@@ -16,7 +16,7 @@ public:
     explicit ResultFileWriter(const std::string& filepath);
     ~ResultFileWriter() override;
 
-    void onPrimeFound(const std::string& prime_hex,
+    void onPrimeFound(const std::string& prime_dec,
                       uint32_t bit_length,
                       uint64_t prime_index) override;
 

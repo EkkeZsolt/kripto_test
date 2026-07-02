@@ -34,19 +34,19 @@ ConsoleLogger::ConsoleLogger(bool verbose) : verbose_(verbose) {
     enableAnsiColors();
 }
 
-void ConsoleLogger::onPrimeFound(const std::string& prime_hex,
+void ConsoleLogger::onPrimeFound(const std::string& prime_dec,
                                   uint32_t bit_length,
                                   uint64_t prime_index) {
-    std::string display_hex = prime_hex;
-    if (display_hex.length() > 32) {
-        display_hex = display_hex.substr(0, 16) + "..." +
-                      display_hex.substr(display_hex.length() - 16);
+    std::string display_dec = prime_dec;
+    if (display_dec.length() > 32) {
+        display_dec = display_dec.substr(0, 16) + "..." +
+                      display_dec.substr(display_dec.length() - 16);
     }
 
     std::cout << Color::BOLD << Color::GREEN
               << "  [PRIME #" << prime_index << "] "
               << Color::RESET << Color::CYAN
-              << display_hex
+              << display_dec
               << Color::DIM << " (" << bit_length << " bit)"
               << Color::RESET << std::endl;
 }

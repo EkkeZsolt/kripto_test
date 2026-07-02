@@ -13,7 +13,7 @@ public:
     /// @param verbose Ha true, minden batch után kiír haladást
     explicit ConsoleLogger(bool verbose = true);
 
-    void onPrimeFound(const std::string& prime_hex,
+    void onPrimeFound(const std::string& prime_dec,
                       uint32_t bit_length,
                       uint64_t prime_index) override;
 

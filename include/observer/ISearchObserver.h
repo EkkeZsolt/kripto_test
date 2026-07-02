@@ -16,10 +16,10 @@ public:
     virtual ~ISearchObserver() = default;
 
     /// Új prím találat
-    /// @param prime_hex    A talált prím hexadecimális formában
+    /// @param prime_dec    A talált prím decimális formában
     /// @param bit_length   A prím bit hossza
     /// @param prime_index  Hányadik talált prím (1-től)
-    virtual void onPrimeFound(const std::string& prime_hex,
+    virtual void onPrimeFound(const std::string& prime_dec,
                               uint32_t bit_length,
                               uint64_t prime_index) = 0;
 
