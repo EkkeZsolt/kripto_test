@@ -65,27 +65,51 @@ void PrimeSearcher::initializeSequentialState() {
     // Kezdőérték: 3 (az első vizsgálandó páratlan prím jelölt 2 után)
     current_sequential_candidate_[0] = 3;
 
-    // Próbáljuk meg kiolvasni az utolsó prímet a fájlból
+    // Próbáljuk meg kiolvasni az utolsó prímet és indexet a fájlból
     if (!config_.outputFile().empty()) {
         std::ifstream file(config_.outputFile());
         if (file.is_open()) {
             std::string line, last_hex;
+            uint64_t last_index = 0;
             while (std::getline(file, line)) {
                 // Keresünk egy sort, ami nem komment és tartalmaz " | "-t
                 if (!line.empty() && line[0] != '#') {
-                    size_t pos = line.rfind(" | ");
-                    if (pos != std::string::npos) {
-                        last_hex = line.substr(pos + 3);
+                    size_t first_pos = line.find(" | ");
+                    size_t last_pos = line.rfind(" | ");
+                    if (first_pos != std::string::npos && last_pos != std::string::npos) {
+                        try {
+                            last_index = std::stoull(line.substr(0, first_pos));
+                        } catch (...) {
+                            // Ha az index parsolása meghiúsul, békén hagyjuk
+                        }
+                        last_hex = line.substr(last_pos + 3);
                     }
                 }
             }
             if (!last_hex.empty()) {
+                total_found_ = last_index;
                 // Ha találtunk mentett prímet, onnan folytatjuk (+2)
                 BigIntConverter::fromHex(last_hex, current_sequential_candidate_.data(), num_limbs);
                 addUi32(current_sequential_candidate_, 2);
-                std::cout << "  Folytatas innen: " << last_hex << " + 2\n";
+                std::cout << "  Folytatas innen: " << last_hex << " + 2 (Mentett index: " << last_index << ")\n";
+            }
+            else {
+                // Ha nem találtunk mentett prímet, akkor a 2 a legelső prímünk!
+                total_found_++;
+                std::vector<uint32_t> two_limbs(num_limbs, 0);
+                two_limbs[0] = 2;
+                std::string hex = BigIntConverter::toHex(two_limbs.data(), num_limbs);
+                notifyPrimeFound(hex, config_.bitLength());
             }
         }
+    }
+    else {
+        // Ha nincs kimeneti fájl megadva, akkor is a 2 az első
+        total_found_++;
+        std::vector<uint32_t> two_limbs(num_limbs, 0);
+        two_limbs[0] = 2;
+        std::string hex = BigIntConverter::toHex(two_limbs.data(), num_limbs);
+        notifyPrimeFound(hex, config_.bitLength());
     }
 }
 

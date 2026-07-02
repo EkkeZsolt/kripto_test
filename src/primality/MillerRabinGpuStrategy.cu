@@ -97,6 +97,9 @@ public:
         cgbn_rotate_right(_env, power, power, trailing);
 
         for (k = 0; k < (int)prime_count; k++) {
+            if (cgbn_equals_ui32(_env, candidate, primes[k])) {
+                return prime_count;
+            }
             cgbn_set_ui32(_env, x, primes[k]);
             powm(x, power, candidate);
             cgbn_sub_ui32(_env, minus_one, candidate, 1);

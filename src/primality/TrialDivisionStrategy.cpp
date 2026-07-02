@@ -67,7 +67,16 @@ std::vector<PrimalityResult> TrialDivisionStrategy::testBatch(
 
         for (uint32_t prime : small_primes_) {
             // Ha a jelölt maga a kis prím, az prím
-            if (limbs.size() == 1 && limbs[0] == prime) {
+            bool is_equal = (limbs[0] == prime);
+            if (is_equal) {
+                for (size_t i = 1; i < limbs.size(); i++) {
+                    if (limbs[i] != 0) {
+                        is_equal = false;
+                        break;
+                    }
+                }
+            }
+            if (is_equal) {
                 break;
             }
             if (isDivisible(limbs.data(), (uint32_t)limbs.size(), prime)) {
