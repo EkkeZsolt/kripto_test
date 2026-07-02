@@ -146,18 +146,32 @@ MillerRabinGpuStrategy::MillerRabinGpuStrategy(uint32_t rounds, uint32_t tpb)
 MillerRabinGpuStrategy::~MillerRabinGpuStrategy() = default;
 
 std::string MillerRabinGpuStrategy::name() const {
-    return "MillerRabin-GPU (CGBN 4096-bit)";
+    return "MillerRabin-GPU (CGBN 4096-bit, Deterministic)";
 }
 
-std::vector<uint32_t> MillerRabinGpuStrategy::generateWitnessPrimes(uint32_t count) const {
+std::vector<uint32_t> MillerRabinGpuStrategy::generateDeterministicWitnesses(uint32_t bit_length) const {
+    // Riemann-sejtés (GRH) alapon determinisztikus határérték kiszámolása: L = 2 * (ln(N))^2
+    // ln(N) <= bit_length * ln(2)
+    double ln_N = (double)bit_length * 0.6931471805599453;
+    double limit_d = 2.0 * ln_N * ln_N;
+    uint32_t limit = (uint32_t)limit_d;
+    if (limit < 2) limit = 2;
+
+    // Prímszita a tanúk összegyűjtéséhez
+    std::vector<bool> is_prime(limit + 1, true);
+    is_prime[0] = is_prime[1] = false;
+    for (uint32_t i = 2; i * i <= limit; i++) {
+        if (is_prime[i]) {
+            for (uint32_t j = i * i; j <= limit; j += i) {
+                is_prime[j] = false;
+            }
+        }
+    }
     std::vector<uint32_t> primes;
-    primes.push_back(2);
-    uint32_t cur = 3;
-    while (primes.size() < count) {
-        bool ok = true;
-        for (auto p : primes) { if (cur % p == 0) { ok = false; break; } }
-        if (ok) primes.push_back(cur);
-        cur += 2;
+    for (uint32_t i = 2; i <= limit; i++) {
+        if (is_prime[i]) {
+            primes.push_back(i);
+        }
     }
     return primes;
 }
@@ -172,7 +186,8 @@ std::vector<PrimalityResult> MillerRabinGpuStrategy::testBatch(
     const int32_t  TPB = tpb_ ? tpb_ : 128;
     const int32_t  IPB = TPB / params::TPI;
 
-    auto witness = generateWitnessPrimes(mr_rounds_);
+    auto witness = generateDeterministicWitnesses(bit_length);
+    const uint32_t num_rounds = (uint32_t)witness.size();
 
     std::vector<instance_t> host(ic);
     for (uint32_t i = 0; i < ic; i++) {
@@ -183,7 +198,7 @@ std::vector<PrimalityResult> MillerRabinGpuStrategy::testBatch(
     }
 
     CudaMemory<instance_t> gpu_inst(ic);
-    CudaMemory<uint32_t>   gpu_pr(mr_rounds_);
+    CudaMemory<uint32_t>   gpu_pr(num_rounds);
     gpu_inst.copyToDevice(host.data());
     gpu_pr.copyToDevice(witness.data());
 
@@ -191,7 +206,7 @@ std::vector<PrimalityResult> MillerRabinGpuStrategy::testBatch(
     CUDA_CHECK(cgbn_error_report_alloc(&report));
 
     kernel_miller_rabin<params><<<(ic+IPB-1)/IPB, TPB>>>(
-        report, gpu_inst.get(), ic, gpu_pr.get(), mr_rounds_);
+        report, gpu_inst.get(), ic, gpu_pr.get(), num_rounds);
     CUDA_CHECK(cudaDeviceSynchronize());
 
     if (cgbn_error_report_check(report)) {
@@ -205,7 +220,7 @@ std::vector<PrimalityResult> MillerRabinGpuStrategy::testBatch(
     std::vector<PrimalityResult> res;
     res.reserve(ic);
     for (uint32_t i = 0; i < ic; i++) {
-        res.push_back({i, host[i].passed == mr_rounds_, host[i].passed});
+        res.push_back({i, host[i].passed == num_rounds, host[i].passed});
     }
     return res;
 }

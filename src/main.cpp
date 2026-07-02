@@ -58,7 +58,7 @@ void printUsage() {
               << "  --count N       Hany primet keressen (default: 0 = vegtelen)\n"
               << "  --batch-size N  GPU batch meret (default: 10000)\n"
               << "  --rounds N      Miller-Rabin iteraciok (default: 20)\n"
-              << "  --strategy S    'millerrabin' vagy 'trial' (default: millerrabin)\n"
+              << "  --strategy S    'millerrabin' vagy 'trial' (default: trial)\n"
               << "  --output FILE   Kimeneti fajl (default: nincs)\n"
               << "  --start NUM     Szekvencialis kezdoertek decimális formatumban\n"
               << "  --no-prefilter  Trial division eloszures kikapcsolasa\n"

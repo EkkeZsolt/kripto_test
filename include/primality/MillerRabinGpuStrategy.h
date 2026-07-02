@@ -29,6 +29,6 @@ private:
     uint32_t mr_rounds_;
     uint32_t tpb_;
 
-    /// Miller-Rabin bázis prímek generálása
-    std::vector<uint32_t> generateWitnessPrimes(uint32_t count) const;
+    /// Miller-Rabin bázis prímek generálása (mindig determinisztikus az összes tanúval)
+    std::vector<uint32_t> generateDeterministicWitnesses(uint32_t bit_length) const;
 };
