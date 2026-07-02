@@ -91,7 +91,7 @@ public:
         bool        use_prefilter_        = true;
         bool        verbose_              = true;
         bool        sequential_mode_      = true;
-        std::string start_number_         = "100000000000000000000000000000000000000000000000000000000000";
+        std::string start_number_         = "";
         std::vector<std::shared_ptr<ISearchObserver>> observers_;
     };
 
@@ -120,6 +120,6 @@ private:
     bool        use_prefilter_        = true;
     bool        verbose_              = true;
     bool        sequential_mode_      = true;
-    std::string start_number_         = "100000000000000000000000000000000000000000000000000000000000";
+    std::string start_number_         = "";
     std::vector<std::shared_ptr<ISearchObserver>> observers_;
 };
