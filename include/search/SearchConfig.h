@@ -82,16 +82,16 @@ public:
         }
 
     private:
-        uint32_t    bit_length_           = 1024;
+        uint32_t    bit_length_           = 256;
         uint32_t    target_prime_count_   = 0;
         uint32_t    batch_size_           = 10000;
         uint32_t    mr_rounds_            = 20;
-        std::string strategy_name_        = "trial";
+        std::string strategy_name_        = "mr";
         std::string output_file_          = "primes.txt";
         bool        use_prefilter_        = true;
         bool        verbose_              = true;
         bool        sequential_mode_      = true;
-        std::string start_number_         = "";
+        std::string start_number_         = "100000000000000000000000000000000000000000000000000000000000";
         std::vector<std::shared_ptr<ISearchObserver>> observers_;
     };
 
@@ -111,15 +111,15 @@ public:
     }
 
 private:
-    uint32_t    bit_length_           = 1024;
+    uint32_t    bit_length_           = 256;
     uint32_t    target_prime_count_   = 0;       // 0 = végtelen
     uint32_t    batch_size_           = 10000;
     uint32_t    mr_rounds_            = 20;
-    std::string strategy_name_        = "trial";  // szekvenciálishoz trial
+    std::string strategy_name_        = "mr";  // szekvenciálishoz alapból mr
     std::string output_file_          = "primes.txt";
     bool        use_prefilter_        = true;
     bool        verbose_              = true;
     bool        sequential_mode_      = true;
-    std::string start_number_         = "";
+    std::string start_number_         = "100000000000000000000000000000000000000000000000000000000000";
     std::vector<std::shared_ptr<ISearchObserver>> observers_;
 };
