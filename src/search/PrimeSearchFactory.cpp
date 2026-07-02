@@ -52,6 +52,7 @@ std::unique_ptr<PrimeSearcher> PrimeSearchFactory::create(const SearchConfig& co
                .setPrefilter(config.usePrefilter())
                .setVerbose(config.verbose())
                .setSequentialMode(config.sequentialMode())
+               .setStartNumber(config.startNumber())
                .addObserver(console);
 
         if (!config.outputFile().empty()) {

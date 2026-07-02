@@ -20,70 +20,79 @@ public:
     public:
         Builder() = default;
 
-        /// Keresett prímek bit mérete (default: 1024)
         Builder& setBitLength(uint32_t bits) {
-            config_.bit_length_ = bits;
+            bit_length_ = bits;
             return *this;
         }
-
-        /// Hány prímet keressen (default: 0 = végtelen)
         Builder& setPrimeCount(uint32_t count) {
-            config_.target_prime_count_ = count;
+            target_prime_count_ = count;
             return *this;
         }
-
-        /// GPU batch méret – egyszerre ennyi jelöltet tesztel (default: 10000)
         Builder& setBatchSize(uint32_t size) {
-            config_.batch_size_ = size;
+            batch_size_ = size;
             return *this;
         }
-
-        /// Miller-Rabin iterációk száma (default: 20)
         Builder& setMillerRabinRounds(uint32_t rounds) {
-            config_.mr_rounds_ = rounds;
+            mr_rounds_ = rounds;
             return *this;
         }
-
-        /// Stratégia neve: "millerrabin" vagy "trial" (default: "trial")
         Builder& setStrategy(const std::string& name) {
-            config_.strategy_name_ = name;
+            strategy_name_ = name;
             return *this;
         }
-
-        /// Kimeneti/resume fájl (default: "primes.txt")
         Builder& setOutputFile(const std::string& path) {
-            config_.output_file_ = path;
+            output_file_ = path;
             return *this;
         }
-
-        /// Observer hozzáadása
         Builder& addObserver(std::shared_ptr<ISearchObserver> observer) {
-            config_.observers_.push_back(std::move(observer));
+            observers_.push_back(std::move(observer));
             return *this;
         }
-
-        /// Trial division előszűrés engedélyezése (default: true)
         Builder& setPrefilter(bool enabled) {
-            config_.use_prefilter_ = enabled;
+            use_prefilter_ = enabled;
             return *this;
         }
-
-        /// Verbose konzol kimenet (default: true)
         Builder& setVerbose(bool verbose) {
-            config_.verbose_ = verbose;
+            verbose_ = verbose;
             return *this;
         }
-
-        /// Szekvenciális mód: 2-től végtelenig (default: true)
         Builder& setSequentialMode(bool enabled) {
-            config_.sequential_mode_ = enabled;
+            sequential_mode_ = enabled;
+            return *this;
+        }
+        Builder& setStartNumber(const std::string& start_dec) {
+            start_number_ = start_dec;
             return *this;
         }
 
-        SearchConfig build() { return std::move(config_); }
+        SearchConfig build() {
+            SearchConfig config;
+            config.bit_length_ = bit_length_;
+            config.target_prime_count_ = target_prime_count_;
+            config.batch_size_ = batch_size_;
+            config.mr_rounds_ = mr_rounds_;
+            config.strategy_name_ = strategy_name_;
+            config.output_file_ = output_file_;
+            config.use_prefilter_ = use_prefilter_;
+            config.verbose_ = verbose_;
+            config.sequential_mode_ = sequential_mode_;
+            config.start_number_ = start_number_;
+            config.observers_ = std::move(observers_);
+            return config;
+        }
 
     private:
-        SearchConfig config_;
+        uint32_t    bit_length_           = 1024;
+        uint32_t    target_prime_count_   = 0;
+        uint32_t    batch_size_           = 10000;
+        uint32_t    mr_rounds_            = 20;
+        std::string strategy_name_        = "trial";
+        std::string output_file_          = "primes.txt";
+        bool        use_prefilter_        = true;
+        bool        verbose_              = true;
+        bool        sequential_mode_      = true;
+        std::string start_number_         = "";
+        std::vector<std::shared_ptr<ISearchObserver>> observers_;
     };
 
     // ── Getterek ──
@@ -96,6 +105,7 @@ public:
     bool usePrefilter() const { return use_prefilter_; }
     bool verbose() const { return verbose_; }
     bool sequentialMode() const { return sequential_mode_; }
+    const std::string& startNumber() const { return start_number_; }
     const std::vector<std::shared_ptr<ISearchObserver>>& observers() const {
         return observers_;
     }
@@ -109,6 +119,7 @@ private:
     std::string output_file_          = "primes.txt";
     bool        use_prefilter_        = true;
     bool        verbose_              = true;
-    bool        sequential_mode_      = true;     // alapból szekvenciális
+    bool        sequential_mode_      = true;
+    std::string start_number_         = "";
     std::vector<std::shared_ptr<ISearchObserver>> observers_;
 };

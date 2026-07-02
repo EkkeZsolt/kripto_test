@@ -60,6 +60,7 @@ void printUsage() {
               << "  --rounds N      Miller-Rabin iteraciok (default: 20)\n"
               << "  --strategy S    'millerrabin' vagy 'trial' (default: millerrabin)\n"
               << "  --output FILE   Kimeneti fajl (default: nincs)\n"
+              << "  --start NUM     Szekvencialis kezdoertek decimális formatumban\n"
               << "  --no-prefilter  Trial division eloszures kikapcsolasa\n"
               << "  --quiet         Csak primeket ir ki\n"
               << "  --help          Sugo\n"
@@ -114,6 +115,9 @@ int main(int argc, char* argv[]) {
         }
         else if (arg == "--random") {
             builder.setSequentialMode(false);
+        }
+        else if (arg == "--start" && i + 1 < argc) {
+            builder.setStartNumber(argv[++i]);
         }
         else {
             std::cerr << "Ismeretlen opcio: " << arg << std::endl;

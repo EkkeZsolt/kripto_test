@@ -62,11 +62,21 @@ void PrimeSearcher::initializeSequentialState() {
     const uint32_t num_limbs = config_.bitLength() / 32;
     current_sequential_candidate_.assign(num_limbs, 0);
     
-    // Kezdőérték: 3 (az első vizsgálandó páratlan prím jelölt 2 után)
+    // Alapértelmezett kezdőérték: 3 (az első vizsgálandó páratlan prím jelölt 2 után)
     current_sequential_candidate_[0] = 3;
 
-    // Próbáljuk meg kiolvasni az utolsó prímet és indexet a fájlból
-    if (!config_.outputFile().empty()) {
+    bool started_from_config = false;
+    if (!config_.startNumber().empty()) {
+        BigIntConverter::fromDecimal(config_.startNumber(), current_sequential_candidate_.data(), num_limbs);
+        if ((current_sequential_candidate_[0] & 1) == 0) {
+            addUi32(current_sequential_candidate_, 1);
+        }
+        started_from_config = true;
+        std::cout << "  Kezdes egyedi szamtol: " << config_.startNumber() << "\n";
+    }
+
+    // Csak akkor próbáljuk meg kiolvasni az utolsó prímet a fájlból, ha nem adtunk meg egyedi kezdőértéket
+    if (!started_from_config && !config_.outputFile().empty()) {
         std::ifstream file(config_.outputFile());
         if (file.is_open()) {
             std::string line, last_hex;
@@ -92,6 +102,7 @@ void PrimeSearcher::initializeSequentialState() {
                 BigIntConverter::fromHex(last_hex, current_sequential_candidate_.data(), num_limbs);
                 addUi32(current_sequential_candidate_, 2);
                 std::cout << "  Folytatas innen: " << last_hex << " + 2 (Mentett index: " << last_index << ")\n";
+                return;
             }
             else {
                 // Ha nem találtunk mentett prímet, akkor a 2 a legelső prímünk!
@@ -103,8 +114,8 @@ void PrimeSearcher::initializeSequentialState() {
             }
         }
     }
-    else {
-        // Ha nincs kimeneti fájl megadva, akkor is a 2 az első
+    else if (!started_from_config) {
+        // Ha nincs kimeneti fájl megadva, és nem egyedi kezdőérték van, akkor is a 2 az első
         total_found_++;
         std::vector<uint32_t> two_limbs(num_limbs, 0);
         two_limbs[0] = 2;
