@@ -51,6 +51,15 @@ bool TrialDivisionStrategy::isDivisible(const uint32_t* limbs,
     return remainder == 0;
 }
 
+static uint64_t getVal64(const uint32_t* limbs, uint32_t num_limbs) {
+    if (num_limbs == 0) return 0;
+    if (num_limbs == 1) return limbs[0];
+    for (uint32_t i = 2; i < num_limbs; i++) {
+        if (limbs[i] != 0) return 0xFFFFFFFFFFFFFFFFULL;
+    }
+    return ((uint64_t)limbs[1] << 32) | limbs[0];
+}
+
 // ────────────────────────────────────────────────────────
 // Batch teszt: minden jelöltet végigpróbálunk a kis prímekkel
 // ────────────────────────────────────────────────────────
@@ -60,12 +69,18 @@ std::vector<PrimalityResult> TrialDivisionStrategy::testBatch(
 
     std::vector<PrimalityResult> results;
     results.reserve(candidates.size());
-
     for (uint32_t idx = 0; idx < candidates.size(); idx++) {
         const auto& limbs = candidates[idx];
         bool composite = false;
+        uint64_t val64 = getVal64(limbs.data(), (uint32_t)limbs.size());
 
         for (uint32_t prime : small_primes_) {
+            // Négyzetgyök (sqrt) optimalizáció: ha a vizsgált osztó négyzete nagyobb,
+            // mint a jelölt értéke, akkor felesleges tovább keresni, biztosan prím.
+            if ((uint64_t)prime * prime > val64) {
+                break;
+            }
+
             // Ha a jelölt maga a kis prím, az prím
             bool is_equal = (limbs[0] == prime);
             if (is_equal) {
