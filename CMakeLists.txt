@@ -11,7 +11,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # GPU architektúra – felhasználó állíthatja -DCMAKE_CUDA_ARCHITECTURES=XX
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
 endif()
 
 # ──────────────────────────────────────────────

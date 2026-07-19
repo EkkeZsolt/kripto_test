@@ -97,9 +97,14 @@ public:
         cgbn_rotate_right(_env, power, power, trailing);
 
         for (k = 0; k < (int)prime_count; k++) {
-            if (cgbn_equals_ui32(_env, candidate, primes[k])) {
-                return prime_count;
+            int32_t cmp = cgbn_compare_ui32(_env, candidate, primes[k]);
+            if (cmp == 0) {
+                return prime_count; // candidate == primes[k], prím!
             }
+            if (cmp < 0) {
+                return prime_count; // candidate < primes[k], az összes ennél kisebb tanún átment, prím!
+            }
+
             cgbn_set_ui32(_env, x, primes[k]);
             powm(x, power, candidate);
             cgbn_sub_ui32(_env, minus_one, candidate, 1);

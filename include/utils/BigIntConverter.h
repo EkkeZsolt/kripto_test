@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <cgbn/cgbn.h>
-
 class BigIntConverter {
 public:
     /// Decimális string → uint32_t limb tömb (little-endian)

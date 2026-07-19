@@ -8,13 +8,29 @@
 
 #pragma once
 #include "observer/ISearchObserver.h"
+#include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 class SearchConfig {
 public:
+    static constexpr uint64_t kDefaultVramBytes = 6ULL * 1024 * 1024 * 1024;
+    static constexpr uint32_t kMinimumBatchSizeForVram = 0;
+
+    static uint32_t defaultBatchSizeForVramBytes(uint64_t vram_bytes) {
+        constexpr uint32_t bytes_per_candidate = 516; // 4096-bit CGBN instance + passed flag
+        if (vram_bytes <= bytes_per_candidate) {
+            return 1;
+        }
+
+        uint64_t batch_size = vram_bytes / bytes_per_candidate;
+        batch_size = std::min<uint64_t>(batch_size, std::numeric_limits<uint32_t>::max());
+        return static_cast<uint32_t>(batch_size);
+    }
+
     // ── Builder ──
     class Builder {
     public:
@@ -29,7 +45,7 @@ public:
             return *this;
         }
         Builder& setBatchSize(uint32_t size) {
-            batch_size_ = size;
+            batch_size_ = std::max(size, SearchConfig::defaultBatchSizeForVramBytes(SearchConfig::kDefaultVramBytes));
             return *this;
         }
         Builder& setMillerRabinRounds(uint32_t rounds) {
@@ -84,7 +100,7 @@ public:
     private:
         uint32_t    bit_length_           = 256;
         uint32_t    target_prime_count_   = 0;
-        uint32_t    batch_size_           = 10000;
+        uint32_t    batch_size_           = SearchConfig::defaultBatchSizeForVramBytes(SearchConfig::kDefaultVramBytes);
         uint32_t    mr_rounds_            = 20;
         std::string strategy_name_        = "mr";
         std::string output_file_          = "primes.txt";
@@ -113,7 +129,7 @@ public:
 private:
     uint32_t    bit_length_           = 256;
     uint32_t    target_prime_count_   = 0;       // 0 = végtelen
-    uint32_t    batch_size_           = 10000;
+    uint32_t    batch_size_           = SearchConfig::defaultBatchSizeForVramBytes(SearchConfig::kDefaultVramBytes);
     uint32_t    mr_rounds_            = 20;
     std::string strategy_name_        = "mr";  // szekvenciálishoz alapból mr
     std::string output_file_          = "primes.txt";

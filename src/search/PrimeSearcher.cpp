@@ -90,10 +90,20 @@ void PrimeSearcher::initializeSequentialState() {
             }
             if (!last_dec.empty()) {
                 total_found_ = last_index;
-                // Ha találtunk mentett prímet, onnan folytatjuk (+2)
                 BigIntConverter::fromDecimal(last_dec, current_sequential_candidate_.data(), num_limbs);
-                addUi32(current_sequential_candidate_, 2);
-                std::cout << "  Folytatas innen: " << last_dec << " + 2 (Mentett index: " << last_index << ")\n";
+                
+                // Biztosítjuk, hogy a következő jelölt páratlan legyen
+                if (current_sequential_candidate_[0] == 2) {
+                    current_sequential_candidate_[0] = 3;
+                }
+                else if ((current_sequential_candidate_[0] & 1) != 0) {
+                    addUi32(current_sequential_candidate_, 2);
+                }
+                else {
+                    addUi32(current_sequential_candidate_, 1);
+                }
+                
+                std::cout << "  Folytatas innen: " << last_dec << " (Mentett prím index: " << last_index << ")\n";
                 return;
             }
             else {

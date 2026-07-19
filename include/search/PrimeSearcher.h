@@ -38,7 +38,7 @@ private:
     std::vector<std::vector<uint32_t>> generateCandidateBatch(uint32_t count);
 
     /// Értesíti az összes observer-t prím találatról
-    void notifyPrimeFound(const std::string& prime_hex, uint32_t bit_length);
+    void notifyPrimeFound(const std::string& prime_dec, uint32_t bit_length);
 
     /// Értesíti az összes observer-t haladásról
     void notifyProgress(double elapsed_seconds);

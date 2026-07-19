@@ -56,7 +56,7 @@ void printUsage() {
               << "Opciok:\n"
               << "  --bits N        Primek bit merete (default: 1024, max: 4096)\n"
               << "  --count N       Hany primet keressen (default: 0 = vegtelen)\n"
-              << "  --batch-size N  GPU batch meret (default: 10000)\n"
+              << "  --batch-size N  GPU batch meret (default: auto, 6 GiB VRAM alapjan)\n"
               << "  --rounds N      Miller-Rabin iteraciok (default: 20)\n"
               << "  --strategy S    'millerrabin' vagy 'trial' (default: trial)\n"
               << "  --output FILE   Kimeneti fajl (default: nincs)\n"
