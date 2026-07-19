@@ -1,95 +1,55 @@
-# LiptaiKripto – CUDA BigInt Prímszám-kereső
+# High-Performance Cryptography Testbed
 
-GPU-gyorsított prímszám-kereső alkalmazás, amely az NVIDIA [CGBN](https://github.com/NVlabs/CGBN) (Cooperative Groups Big Numbers) könyvtárat használja max **4096 bites** nagy számok kezelésére.
+This repository contains a suite of high-performance cryptographic experiments and prime-searching tools optimized for modern hardware architectures, specifically targeting the **NVIDIA RTX 3090 GPU** and the **AMD Ryzen 9 5950X CPU**.
 
-## ✨ Jellemzők
+The project is divided into three distinct modules, each demonstrating a different approach to large integer arithmetic and primality testing.
 
-- **4096 bites BigInt aritmetika** CGBN-nel (32 GPU thread / szám)
-- **Miller-Rabin prímteszt** windowed Montgomery hatványozással
-- **Batch feldolgozás** – egyszerre több ezer jelölt párhuzamos tesztelése
-- **Design Patternek**: Strategy, Factory, Observer, Builder, RAII
+## Modules
 
-## 🏗️ Architektúra
+### 1. Miller-Rabin GPU Searcher (`/miller_rabin_searcher`)
+An ultra-fast prime searcher that utilizes a deterministic Miller-Rabin algorithm. 
+- **Architecture**: Employs an asynchronous CPU/GPU pipeline via CUDA Streams.
+- **GPU Engine**: Uses **NVIDIA CGBN** (Cooperative Groups Big Number) to perform windowed Montgomery exponentiation concurrently on thousands of 512-bit (or up to 4096-bit) candidate numbers.
+- **CPU Engine**: Uses OpenMP to pre-filter candidates utilizing all 32 threads of the Ryzen 9 5950X before shipping them to the VRAM via Pinned Memory.
+- **Use Case**: Finding massive primes efficiently.
 
-```
-┌──────────────── Host (CPU) ────────────────┐
-│  main.cpp → SearchConfig (Builder)         │
-│           → PrimeSearchFactory (Factory)   │
-│           → PrimeSearcher                  │
-│           → ISearchObserver (Observer)     │
-│              ├── ConsoleLogger             │
-│              └── ResultFileWriter          │
-└──────────────────────┬─────────────────────┘
-                       │ cudaMemcpy
-┌──────────────── Device (GPU) ──────────────┐
-│  IPrimalityStrategy (Strategy)             │
-│    ├── TrialDivisionStrategy (CPU)         │
-│    └── MillerRabinGpuStrategy              │
-│         └── CGBN 4096-bit kernels          │
-│              ├── kernel_miller_rabin       │
-│              └── windowed Montgomery powm  │
-│  CudaMemory<T> (RAII)                     │
-└────────────────────────────────────────────┘
-```
+### 2. Trial Division GPU Searcher (`/trial_division_gpu_searcher`)
+An experimental implementation of single-candidate primality testing.
+- **Algorithm**: Tests a single candidate against a dynamically growing list of known primes stored directly in the GPU's VRAM.
+- **Execution**: The CPU feeds a candidate, and the GPU launches a kernel where each CUDA thread tests the candidate against a distinct known prime using CGBN big-integer division. If no remainder is zero, the candidate is prime and added to the VRAM list.
+- **Memory**: Capable of storing millions of large integer primes in the RTX 3090's 24GB GDDR6X VRAM.
 
-## 📋 Előfeltételek
+### 3. RSA-129 Cracker Experiment (`/rsa_cracker_experiment`)
+A practical demonstration of factoring a 129-digit RSA modulus (the famous Martin Gardner challenge).
+- **Academic Approach**: Instead of using naive brute force, this experiment automates the download, extraction, and execution of **YAFU** (Yet Another Factoring Utility), integrating the academic GNFS (General Number Field Sieve) algorithm.
+- **Performance**: Pushes the Ryzen 9 5950X to its absolute limits, deploying the workload across all 32 logical threads to factor the RSA-129 challenge in a realistic timeframe.
 
-- **CUDA Toolkit 12.x**
-- **CMake 3.18+**
-- **Visual Studio 2022** (C++ desktop development workload)
-- **NVIDIA GPU** (Compute Capability 7.0+)
+## Build Instructions
 
-## 🔧 Build
+This project uses CMake as its build system. The NVIDIA CUDA Toolkit (v11.x or v12.x) and a compatible host compiler (MSVC 2019+ on Windows or GCC/Clang on Linux) are required.
 
+### Dependencies
+- **CUDA Toolkit**: Required for `miller_rabin_searcher` and `trial_division_gpu_searcher`.
+- **CGBN**: Included as a header-only library in `external/CGBN`.
+- **OpenMP**: Supported by your C++ compiler.
+
+### Compiling
+You can build the entire suite from the root directory:
 ```bash
-# Klónozás submodule-okkal
-git clone --recursive <repo-url>
-cd liptaikripto
+# Generate build files
+cmake -B build -S .
 
-# Build
-mkdir build && cd build
-cmake .. -DCMAKE_CUDA_ARCHITECTURES=86
-cmake --build . --config Release
+# Build specific targets in Release mode
+cmake --build build --config Release --target MillerRabinSearcher
+cmake --build build --config Release --target TrialDivisionGpuSearcher
+cmake --build build --config Release --target RSACrackerExperiment
 ```
 
-## 🚀 Használat
+## Hardware Optimization Details
+The code contains specific optimizations for SM 86 architecture (RTX 3090):
+- **Occupancy**: Thread-blocks are sized at 256 to maximize warp scheduling on SM 86.
+- **Math**: Compiled with `-use_fast_math` and PTX ISA optimizations (`--expt-relaxed-constexpr`).
+- **Data Transfer**: Zero-copy pinned memory is utilized to hide H2D and D2H latency behind kernel execution in the Miller-Rabin searcher.
 
-```bash
-# Alapértelmezett keresés: 1024 bites random prímek
-./LiptaiKripto
-
-# Testreszabott keresés
-./LiptaiKripto --bits 2048 --batch-size 50000 --rounds 25 --output primes.txt
-```
-
-### Parancssori opciók
-
-| Opció | Leírás | Alapértelmezett |
-|-------|--------|-----------------|
-| `--bits` | Keresett prímek bit mérete | 1024 |
-| `--count` | Hány prímet keressen | 10 |
-| `--batch-size` | GPU batch méret | 10000 |
-| `--rounds` | Miller-Rabin iterációk | 20 |
-| `--output` | Kimeneti fájl | (nincs) |
-| `--strategy` | Stratégia: `millerrabin` / `trial` | `millerrabin` |
-
-## 📁 Projekt Struktúra
-
-```
-liptaikripto/
-├── CMakeLists.txt          # Build konfiguráció
-├── external/CGBN/          # CGBN könyvtár (git submodule)
-├── include/                # Header fájlok
-│   ├── config/             # CGBN paraméterek
-│   ├── primality/          # Prímteszt stratégiák
-│   ├── search/             # Keresési motor
-│   ├── observer/           # Observer pattern
-│   ├── cuda/               # RAII GPU memória
-│   └── utils/              # Konverziós segédletek
-├── src/                    # Implementációk
-└── tests/                  # Unit tesztek
-```
-
-## 📜 Licensz
-
-MIT
+## License
+MIT License.

@@ -1,38 +1,35 @@
-# Build
+# CMake & Build
 build/
+bin/
 out/
-cmake-build-*/
-x64/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+Makefile
 
-# IDE
+# IDE files
 .vs/
 .vscode/
-*.suo
 *.user
-*.sln.docstates
-*.vcxproj.user
+*.suo
+*.sln
+*.vcxproj
+*.vcxproj.filters
 
-# Compiled
-*.obj
-*.exe
-*.dll
-*.lib
+# RSA Cracker Experiment downloads
+rsa_cracker_experiment/yafu.zip
+rsa_cracker_experiment/yafu_full.zip
+rsa_cracker_experiment/yafu_test.zip
+rsa_cracker_experiment/yafu_bin/
+rsa_cracker_experiment/yafu_134_extracted/
+yafu.zip
+yafu_bin/
+
+# Other generated files
+primes.txt
+*.log
 *.pdb
 *.ilk
-*.exp
-
-# CUDA
-*.cubin
-*.fatbin
-*.ptx
-*.gpu
-
-# OS
-Thumbs.db
-Desktop.ini
-.DS_Store
-
-# Output
-results/
-*.csv
-*.log
+*.obj
+*.exe
