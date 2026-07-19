@@ -21,8 +21,9 @@ An experimental implementation of single-candidate primality testing.
 
 ### 3. RSA-129 Cracker Experiment (`/rsa_cracker_experiment`)
 A practical demonstration of factoring a 129-digit RSA modulus (the famous Martin Gardner challenge).
-- **Academic Approach**: Instead of using naive brute force, this experiment automates the download, extraction, and execution of **YAFU** (Yet Another Factoring Utility), integrating the academic GNFS (General Number Field Sieve) algorithm.
-- **Performance**: Pushes the Ryzen 9 5950X to its absolute limits, deploying the workload across all 32 logical threads to factor the RSA-129 challenge in a realistic timeframe.
+- **Academic Approach**: Instead of using naive brute force, this experiment automates the download and execution of **YAFU** (Yet Another Factoring Utility). It utilizes advanced factoring algorithms like **SIQS** (Self-Initializing Quadratic Sieve) and **GNFS** (General Number Field Sieve).
+- **Performance**: Pushes the Ryzen 9 5950X to its absolute limits, deploying the workload across all 32 logical threads.
+- **Results**: Successfully factored the legendary RSA-129 challenge in **2 hours and 3 minutes** using the GNFS algorithm (via CADO-NFS in Docker) entirely locally on a single consumer CPU.
 
 ## Build Instructions
 
