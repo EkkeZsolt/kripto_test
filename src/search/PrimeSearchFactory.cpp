@@ -3,6 +3,8 @@
  *
  * Design Pattern: Factory
  * A konfiguráció alapján összeszereli a teljes keresési rendszert.
+ *
+ * RTX 3090 optimalizált: TPB 256, nagyobb előszűrő határ.
  ***/
 
 #include "search/PrimeSearchFactory.h"
@@ -17,10 +19,13 @@ std::unique_ptr<PrimeSearcher> PrimeSearchFactory::create(const SearchConfig& co
     std::unique_ptr<IPrimalityStrategy> strategy;
 
     if (config.strategyName() == "millerrabin" || config.strategyName() == "mr") {
+        // RTX 3090: TPB 256 optimális az SM 86 occupancy-hoz
+        // 4096-bit CGBN-nél TPI=32, tehát 256/32 = 8 instance/block
         strategy = std::make_unique<MillerRabinGpuStrategy>(
-            config.millerRabinRounds(), 128);
+            config.millerRabinRounds(), 256);
     }
     else if (config.strategyName() == "trial") {
+        // Nagyobb határ az OpenMP párhuzamos előszűrésnél
         strategy = std::make_unique<TrialDivisionStrategy>(100000);
     }
     else {
@@ -30,9 +35,11 @@ std::unique_ptr<PrimeSearcher> PrimeSearchFactory::create(const SearchConfig& co
     }
 
     // ── Előszűrő (trial division, opcionális) ──
+    // OpenMP párhuzamos: a Ryzen 9 5950X mind a 32 szálát kihasználja
     std::unique_ptr<IPrimalityStrategy> prefilter;
     if (config.usePrefilter() && config.strategyName() != "trial") {
-        prefilter = std::make_unique<TrialDivisionStrategy>(10000);
+        // 100000-ig szűrünk (9592 kis prímmel) – OpenMP-vel gyors
+        prefilter = std::make_unique<TrialDivisionStrategy>(100000);
     }
 
     // ── Observer-ek hozzáadása a config-hoz ──
@@ -51,7 +58,6 @@ std::unique_ptr<PrimeSearcher> PrimeSearchFactory::create(const SearchConfig& co
                .setStrategy(config.strategyName())
                .setPrefilter(config.usePrefilter())
                .setVerbose(config.verbose())
-               .setSequentialMode(config.sequentialMode())
                .setStartNumber(config.startNumber())
                .addObserver(console);
 

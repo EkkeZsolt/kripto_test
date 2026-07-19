@@ -17,7 +17,8 @@
 
 class SearchConfig {
 public:
-    static constexpr uint64_t kDefaultVramBytes = 6ULL * 1024 * 1024 * 1024;
+    // RTX 3090: 24 GB VRAM – 20 GiB használunk, tartalék a CUDA overheadre
+    static constexpr uint64_t kDefaultVramBytes = 20ULL * 1024 * 1024 * 1024;
     static constexpr uint32_t kMinimumBatchSizeForVram = 0;
 
     static uint32_t defaultBatchSizeForVramBytes(uint64_t vram_bytes) {
@@ -72,10 +73,6 @@ public:
             verbose_ = verbose;
             return *this;
         }
-        Builder& setSequentialMode(bool enabled) {
-            sequential_mode_ = enabled;
-            return *this;
-        }
         Builder& setStartNumber(const std::string& start_dec) {
             start_number_ = start_dec;
             return *this;
@@ -91,7 +88,6 @@ public:
             config.output_file_ = output_file_;
             config.use_prefilter_ = use_prefilter_;
             config.verbose_ = verbose_;
-            config.sequential_mode_ = sequential_mode_;
             config.start_number_ = start_number_;
             config.observers_ = std::move(observers_);
             return config;
@@ -106,7 +102,6 @@ public:
         std::string output_file_          = "primes.txt";
         bool        use_prefilter_        = true;
         bool        verbose_              = true;
-        bool        sequential_mode_      = true;
         std::string start_number_         = "";
         std::vector<std::shared_ptr<ISearchObserver>> observers_;
     };
@@ -120,7 +115,6 @@ public:
     const std::string& outputFile() const { return output_file_; }
     bool usePrefilter() const { return use_prefilter_; }
     bool verbose() const { return verbose_; }
-    bool sequentialMode() const { return sequential_mode_; }
     const std::string& startNumber() const { return start_number_; }
     const std::vector<std::shared_ptr<ISearchObserver>>& observers() const {
         return observers_;
@@ -135,7 +129,6 @@ private:
     std::string output_file_          = "primes.txt";
     bool        use_prefilter_        = true;
     bool        verbose_              = true;
-    bool        sequential_mode_      = true;
     std::string start_number_         = "";
     std::vector<std::shared_ptr<ISearchObserver>> observers_;
 };

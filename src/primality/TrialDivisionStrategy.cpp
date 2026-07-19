@@ -1,16 +1,20 @@
 /***
  * TrialDivisionStrategy.cpp – CPU Trial Division Implementáció
+ *
+ * OpenMP párhuzamosítás: a Ryzen 9 5950X összes magját (16C/32T)
+ * kihasználja a jelöltek párhuzamos szűréséhez.
  ***/
 
 #include "primality/TrialDivisionStrategy.h"
 #include <cmath>
+#include <omp.h>
 
 TrialDivisionStrategy::TrialDivisionStrategy(uint32_t max_divisor) {
     generateSmallPrimes(max_divisor);
 }
 
 std::string TrialDivisionStrategy::name() const {
-    return "TrialDivision-CPU";
+    return "TrialDivision-CPU (OpenMP)";
 }
 
 // ────────────────────────────────────────────────────────
@@ -61,20 +65,29 @@ static uint64_t getVal64(const uint32_t* limbs, uint32_t num_limbs) {
 }
 
 // ────────────────────────────────────────────────────────
-// Batch teszt: minden jelöltet végigpróbálunk a kis prímekkel
+// Batch teszt: OpenMP párhuzamos – Ryzen 9 5950X 32 szálat használ
+// Minden jelöltet függetlenül tesztelünk, nincs versenyhelyzet.
 // ────────────────────────────────────────────────────────
 std::vector<PrimalityResult> TrialDivisionStrategy::testBatch(
         const std::vector<std::vector<uint32_t>>& candidates,
         uint32_t bit_length) {
 
-    std::vector<PrimalityResult> results;
-    results.reserve(candidates.size());
-    for (uint32_t idx = 0; idx < candidates.size(); idx++) {
+    const int n = (int)candidates.size();
+    std::vector<PrimalityResult> results(n);
+
+    // Cache-barát: a kis prímek const referenciája
+    const auto& primes = small_primes_;
+    const uint32_t num_primes = (uint32_t)primes.size();
+
+    #pragma omp parallel for schedule(dynamic, 64)
+    for (int idx = 0; idx < n; idx++) {
         const auto& limbs = candidates[idx];
         bool composite = false;
         uint64_t val64 = getVal64(limbs.data(), (uint32_t)limbs.size());
 
-        for (uint32_t prime : small_primes_) {
+        for (uint32_t p = 0; p < num_primes; p++) {
+            uint32_t prime = primes[p];
+
             // Négyzetgyök (sqrt) optimalizáció: ha a vizsgált osztó négyzete nagyobb,
             // mint a jelölt értéke, akkor felesleges tovább keresni, biztosan prím.
             if ((uint64_t)prime * prime > val64) {
@@ -94,17 +107,23 @@ std::vector<PrimalityResult> TrialDivisionStrategy::testBatch(
             if (is_equal) {
                 break;
             }
-            if (isDivisible(limbs.data(), (uint32_t)limbs.size(), prime)) {
+
+            // Oszthatóság ellenőrzés
+            uint64_t remainder = 0;
+            for (int i = (int)limbs.size() - 1; i >= 0; i--) {
+                remainder = (remainder << 32) | (uint64_t)limbs[i];
+                remainder = remainder % prime;
+            }
+            if (remainder == 0) {
                 composite = true;
                 break;
             }
         }
 
-        PrimalityResult r;
-        r.index = idx;
-        r.is_probably_prime = !composite;
-        r.rounds_passed = composite ? 0 : (uint32_t)small_primes_.size();
-        results.push_back(r);
+        // Pre-allocált results tömbbe írás index alapján – thread-safe
+        results[idx].index = (uint32_t)idx;
+        results[idx].is_probably_prime = !composite;
+        results[idx].rounds_passed = composite ? 0 : num_primes;
     }
 
     return results;

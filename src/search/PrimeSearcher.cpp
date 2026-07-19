@@ -1,5 +1,10 @@
 /***
  * PrimeSearcher.cpp – Keresési Motor Implementáció
+ *
+ * RTX 3090 + Ryzen 9 5950X optimalizált:
+ * - OpenMP párhuzamos jelölt generálás (32 szál)
+ * - CPU/GPU overlap pipeline: a CPU generálja és előszűri a
+ *   következő batch-et, miközben a GPU dolgozik az aktuálison
  ***/
 
 #include "search/PrimeSearcher.h"
@@ -8,6 +13,10 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <omp.h>
+#include <random>
+#include <future>
+#include <utility>
 
 PrimeSearcher::PrimeSearcher(SearchConfig config,
                               std::unique_ptr<IPrimalityStrategy> strategy,
@@ -16,18 +25,39 @@ PrimeSearcher::PrimeSearcher(SearchConfig config,
     , strategy_(std::move(strategy))
     , prefilter_(std::move(prefilter)) {}
 
+// ────────────────────────────────────────────────────────
+// Következő batch generálása szekvenciálisan
+// ────────────────────────────────────────────────────────
 std::vector<std::vector<uint32_t>> PrimeSearcher::generateCandidateBatch(uint32_t count) {
-    const uint32_t num_limbs = config_.bitLength() / 32;
     std::vector<std::vector<uint32_t>> batch;
     batch.reserve(count);
-
     for (uint32_t i = 0; i < count; i++) {
-        std::vector<uint32_t> limbs(num_limbs, 0);
-        BigIntConverter::randomBits(limbs.data(), num_limbs,
-                                    config_.bitLength(), true);
-        batch.push_back(std::move(limbs));
+        batch.push_back(current_sequential_candidate_);
+        // Következő páratlan szám (+2)
+        addUi32(current_sequential_candidate_, 2);
     }
     return batch;
+}
+
+// ────────────────────────────────────────────────────────
+// Előszűrés helper – OpenMP trial division-nel
+// ────────────────────────────────────────────────────────
+std::vector<std::vector<uint32_t>> PrimeSearcher::prefilterCandidates(
+        std::vector<std::vector<uint32_t>>& candidates) {
+    if (!prefilter_ || !config_.usePrefilter()) {
+        return std::move(candidates);
+    }
+
+    auto pre_results = prefilter_->testBatch(candidates, config_.bitLength());
+
+    std::vector<std::vector<uint32_t>> filtered;
+    filtered.reserve(candidates.size() / 4); // ~75% kiszűrődik
+    for (const auto& r : pre_results) {
+        if (r.is_probably_prime) {
+            filtered.push_back(std::move(candidates[r.index]));
+        }
+    }
+    return filtered;
 }
 
 void PrimeSearcher::notifyPrimeFound(const std::string& prime_dec, uint32_t bit_length) {
@@ -120,17 +150,27 @@ void PrimeSearcher::initializeSequentialState() {
     }
 }
 
-std::vector<std::vector<uint32_t>> PrimeSearcher::generateSequentialBatch(uint32_t count) {
-    std::vector<std::vector<uint32_t>> batch;
-    batch.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
-        batch.push_back(current_sequential_candidate_);
-        // Következő páratlan szám (+2)
-        addUi32(current_sequential_candidate_, 2);
-    }
-    return batch;
-}
 
+
+// ════════════════════════════════════════════════════════
+// GPU batch teszt eredményeinek tárolására szolgáló struktúra
+// A std::async lambda-ból visszaadjuk mind az eredményeket,
+// mind a jelölteket, hogy a feldolgozás hibátlan legyen.
+// ════════════════════════════════════════════════════════
+struct GpuBatchResult {
+    std::vector<PrimalityResult> results;
+    std::vector<std::vector<uint32_t>> candidates; // a szűrt jelöltek
+};
+
+// ════════════════════════════════════════════════════════
+// Fő keresési ciklus – CPU/GPU Overlap Pipeline
+//
+// Pipeline lépések:
+// 1. CPU: Jelöltek generálása (OpenMP párhuzamos)
+// 2. CPU: Előszűrés trial division-nel (OpenMP párhuzamos)
+// 3. GPU: Miller-Rabin teszt (CUDA stream)
+// 4. CPU: Közben generálja a KÖVETKEZŐ batch-et (overlap!)
+// ════════════════════════════════════════════════════════
 std::vector<std::string> PrimeSearcher::search() {
     std::vector<std::string> found_primes;
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -139,57 +179,65 @@ std::vector<std::string> PrimeSearcher::search() {
               << "\n  Strategia: " << strategy_->name()
               << "\n  Batch meret: " << config_.batchSize()
               << "\n  Miller-Rabin korok: " << config_.millerRabinRounds()
+              << "\n  OpenMP szalak: " << omp_get_max_threads()
               << "\n  Cel: " << config_.targetPrimeCount() << " prim"
               << "\n" << std::endl;
 
-    if (config_.sequentialMode()) {
-        initializeSequentialState();
-    }
+    initializeSequentialState();
+
+    // ── CPU/GPU Overlap Pipeline ──
+    // Előre generáljuk az első batch-et a CPU-n
+    auto candidates = generateCandidateBatch(config_.batchSize());
+    auto filtered = prefilterCandidates(candidates);
 
     while (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount()) {
-        // 1. Jelöltek generálása (random vagy szekvenciális)
-        auto candidates = config_.sequentialMode() 
-            ? generateSequentialBatch(config_.batchSize()) 
-            : generateCandidateBatch(config_.batchSize());
 
-        // 2. Opcionális előszűrés trial division-nel
-        if (prefilter_ && config_.usePrefilter()) {
-            auto pre_results = prefilter_->testBatch(candidates, config_.bitLength());
+        // ── PIPELINE LÉPÉS 1: GPU-ra küldjük a szűrt jelölteket (async) ──
+        std::future<GpuBatchResult> gpu_future;
+        bool has_gpu_work = !filtered.empty();
 
-            // Csak az előszűrést átment jelölteket tartjuk meg
-            std::vector<std::vector<uint32_t>> filtered;
-            for (const auto& r : pre_results) {
-                if (r.is_probably_prime) {
-                    filtered.push_back(std::move(candidates[r.index]));
+        if (has_gpu_work) {
+            auto bit_length = config_.bitLength();
+
+            gpu_future = std::async(std::launch::async,
+                [this, fc = std::move(filtered), bit_length]() mutable -> GpuBatchResult {
+                    GpuBatchResult br;
+                    br.results = strategy_->testBatch(fc, bit_length);
+                    br.candidates = std::move(fc);
+                    return br;
+                });
+        }
+
+        // ── PIPELINE LÉPÉS 2: Közben a CPU generálja a KÖVETKEZŐ batch-et ──
+        // Ez történik PÁRHUZAMOSAN a GPU munkával!
+        auto next_candidates = generateCandidateBatch(config_.batchSize());
+        auto next_filtered = prefilterCandidates(next_candidates);
+
+        // ── PIPELINE LÉPÉS 3: GPU eredmények feldolgozása ──
+        if (has_gpu_work) {
+            auto batch_result = gpu_future.get();
+
+            for (const auto& r : batch_result.results) {
+                if (r.is_probably_prime &&
+                    (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount())) {
+                    total_found_++;
+                    const auto& limbs = batch_result.candidates[r.index];
+                    std::string dec = BigIntConverter::toDecimal(limbs.data(), (uint32_t)limbs.size());
+                    found_primes.push_back(dec);
+                    notifyPrimeFound(dec, config_.bitLength());
                 }
             }
-            candidates = std::move(filtered);
         }
 
-        if (candidates.empty()) {
-            total_tested_ += config_.batchSize();
-            continue;
-        }
-
-        // 3. Miller-Rabin GPU teszt
-        auto results = strategy_->testBatch(candidates, config_.bitLength());
         total_tested_ += config_.batchSize();
 
-        // 4. Prímek feldolgozása
-        for (const auto& r : results) {
-            if (r.is_probably_prime && (config_.targetPrimeCount() == 0 || total_found_ < config_.targetPrimeCount())) {
-                total_found_++;
-                const auto& limbs = candidates[r.index];
-                std::string dec = BigIntConverter::toDecimal(limbs.data(), (uint32_t)limbs.size());
-                found_primes.push_back(dec);
-                notifyPrimeFound(dec, config_.bitLength());
-            }
-        }
-
-        // 5. Haladás jelentés
+        // Haladás jelentés
         auto now = std::chrono::high_resolution_clock::now();
         double elapsed = std::chrono::duration<double>(now - start_time).count();
         notifyProgress(elapsed);
+
+        // Következő iteráció előkészítése
+        filtered = std::move(next_filtered);
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();

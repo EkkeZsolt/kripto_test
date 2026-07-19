@@ -2,10 +2,14 @@
  * PrimeSearcher.h – Prímszám Keresési Motor
  *
  * A fő keresési logikát tartalmazza:
- * 1. Random jelöltek generálása
- * 2. Opcionális trial division előszűrés
- * 3. Miller-Rabin GPU batch teszt
+ * 1. Random jelöltek generálása (OpenMP párhuzamos)
+ * 2. Opcionális trial division előszűrés (OpenMP párhuzamos)
+ * 3. Miller-Rabin GPU batch teszt (CUDA stream pipeline)
  * 4. Observer-ek értesítése
+ *
+ * RTX 3090 + Ryzen 9 5950X optimalizált:
+ * - CPU/GPU átfedés: a CPU generálja a következő batch-et, miközben a GPU dolgozik
+ * - OpenMP: jelölt generálás és előszűrés mind a 32 szálon
  ***/
 
 #pragma once
@@ -13,6 +17,7 @@
 #include "primality/IPrimalityStrategy.h"
 #include <memory>
 #include <vector>
+#include <future>
 
 class PrimeSearcher {
 public:
@@ -34,8 +39,12 @@ private:
     uint64_t                            total_tested_ = 0;
     uint64_t                            total_found_  = 0;
 
-    /// Generál egy batch random páratlan jelöltet
+    /// Következő batch generálása szekvenciálisan
     std::vector<std::vector<uint32_t>> generateCandidateBatch(uint32_t count);
+
+    /// Előszűr és visszaadja a szűrt jelölteket
+    std::vector<std::vector<uint32_t>> prefilterCandidates(
+        std::vector<std::vector<uint32_t>>& candidates);
 
     /// Értesíti az összes observer-t prím találatról
     void notifyPrimeFound(const std::string& prime_dec, uint32_t bit_length);
@@ -51,9 +60,6 @@ private:
 
     /// Beállítja a kezdőértéket a szekvenciális kereséshez
     void initializeSequentialState();
-
-    /// Következő szekvenciális batch generálása
-    std::vector<std::vector<uint32_t>> generateSequentialBatch(uint32_t count);
 
     /// BigInt hozzáadása (a += b)
     static void addUi32(std::vector<uint32_t>& limbs, uint32_t val);

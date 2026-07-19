@@ -3,6 +3,8 @@
  *
  * Parancssori interfész a prímszám-keresőhöz.
  * Használat: LiptaiKripto [opciók]
+ *
+ * RTX 3090 + Ryzen 9 5950X optimalizált verzió
  ***/
 
 #include "search/SearchConfig.h"
@@ -11,6 +13,7 @@
 #include <string>
 #include <cstring>
 #include <cuda_runtime.h>
+#include <omp.h>
 
 // ────────────────────────────────────────────────
 // GPU info kiírása
@@ -32,6 +35,16 @@ void printGpuInfo() {
               << "  Compute Capability: " << prop.major << "." << prop.minor << "\n"
               << "  SM-ek: " << prop.multiProcessorCount << "\n"
               << "  VRAM: " << (prop.totalGlobalMem / (1024*1024)) << " MB\n"
+              << "  Max Threads/SM: " << prop.maxThreadsPerMultiProcessor << "\n"
+              << "\033[0m" << std::endl;
+}
+
+// ────────────────────────────────────────────────
+// CPU info kiírása
+// ────────────────────────────────────────────────
+void printCpuInfo() {
+    std::cout << "\033[33m"
+              << "  CPU szalak (OpenMP): " << omp_get_max_threads() << "\n"
               << "\033[0m" << std::endl;
 }
 
@@ -44,7 +57,7 @@ void printBanner() {
   ║   ║╠═╝ ║ ╠═╣║  ║╠╩╗╠╦╝║╠═╝ ║ ║ ║
   ╩═╝╩╩   ╩ ╩ ╩╩  ╩╩ ╩╩╚═╩╩   ╩ ╚═╝
   )" << "\033[0m"
-    << "\033[2m  CUDA BigInt Primszam-kereso | CGBN 4096-bit\033[0m\n"
+    << "\033[2m  CUDA BigInt Primszam-kereso | CGBN 4096-bit | RTX 3090 + Zen 3 Optimized\033[0m\n"
     << std::endl;
 }
 
@@ -54,14 +67,15 @@ void printBanner() {
 void printUsage() {
     std::cout << "Hasznalat: LiptaiKripto [opciok]\n\n"
               << "Opciok:\n"
-              << "  --bits N        Primek bit merete (default: 1024, max: 4096)\n"
+              << "  --bits N        Primek bit merete (default: 256, max: 4096)\n"
               << "  --count N       Hany primet keressen (default: 0 = vegtelen)\n"
-              << "  --batch-size N  GPU batch meret (default: auto, 6 GiB VRAM alapjan)\n"
+              << "  --batch-size N  GPU batch meret (default: auto, 20 GiB VRAM alapjan)\n"
               << "  --rounds N      Miller-Rabin iteraciok (default: 20)\n"
-              << "  --strategy S    'millerrabin' vagy 'trial' (default: trial)\n"
-              << "  --output FILE   Kimeneti fajl (default: nincs)\n"
-              << "  --start NUM     Szekvencialis kezdoertek decimális formatumban\n"
+              << "  --strategy S    'millerrabin' vagy 'trial' (default: mr)\n"
+              << "  --output FILE   Kimeneti fajl (default: primes.txt)\n"
+              << "  --start NUM     Szekvencialis kezdoertek decimalis formatumban\n"
               << "  --no-prefilter  Trial division eloszures kikapcsolasa\n"
+              << "  --threads N     OpenMP szalak szama (default: osszes mag)\n"
               << "  --quiet         Csak primeket ir ki\n"
               << "  --help          Sugo\n"
               << std::endl;
@@ -113,11 +127,14 @@ int main(int argc, char* argv[]) {
         else if (arg == "--quiet") {
             builder.setVerbose(false);
         }
-        else if (arg == "--random") {
-            builder.setSequentialMode(false);
-        }
         else if (arg == "--start" && i + 1 < argc) {
             builder.setStartNumber(argv[++i]);
+        }
+        else if (arg == "--threads" && i + 1 < argc) {
+            int num_threads = std::stoi(argv[++i]);
+            if (num_threads > 0) {
+                omp_set_num_threads(num_threads);
+            }
         }
         else {
             std::cerr << "Ismeretlen opcio: " << arg << std::endl;
@@ -131,8 +148,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    // GPU info
+    // GPU & CPU info
     printGpuInfo();
+    printCpuInfo();
 
     try {
         // Konfiguráció összeállítása
